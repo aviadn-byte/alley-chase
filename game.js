@@ -1,32 +1,83 @@
 'use strict';
 const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
 const W=1200,H=600,G=505,keys=new Set(),palettes=[['#f8ddbc','#efae92','#d98672'],['#d4e8df','#e1b89b','#acbea4'],['#c4bfdc','#c390a8','#857ba1']];
-let state='ready',stage=0,score=0,lives=3,cam=0,time=0,last=0,inv=0,goal=3600,cat,platforms,fish,puddles,particles=[],jumpBuffer=0,coyote=0,sound=false,audio,photos={},dog=true;
+let state='ready',stage=0,score=0,lives=3,cam=0,time=0,last=0,inv=0,cat,platforms,fish,puddles,particles=[],jumpBuffer=0,coyote=0,sound=false,audio,photos={},dog=true;
 let enemies=[],shots=[],speedTime=0,speedCooldown=0,highTime=0,highCooldown=0,shotCooldown=0;
-const names=['סמטת השמש','חצר החברים','גגות בשקיעה'];
-function reset(full=true){if(full){stage=0;score=0;lives=3;}goal=3600+stage*650;cat={x:100,y:G-46,w:58,h:46,vx:0,vy:0,jumps:0,face:1};cam=0;inv=0;particles=[];keys.clear();jumpBuffer=0;coyote=0;speedTime=0;speedCooldown=0;highTime=0;highCooldown=0;shotCooldown=0;shots=[];enemies=[];platforms=[];fish=[];puddles=[];for(let i=0,x=440;x<goal-350;i++,x+=310+(i%3)*45){const h=65+(i%3)*27;platforms.push({x,y:G-h,w:i%3===1?115:78,h});fish.push({x:x+35,y:G-h-50,taken:false});if(i%2===1)puddles.push({x:x+155,w:72+stage*8});if(i%3===0)fish.push({x:x+170,y:G-95,taken:false});}for(let x=830,i=0;x<goal-200;x+=620-stage*70,i++){enemies.push({kind:i%2?'bird':'guard',home:x,x,y:G-44,w:48,h:40,phase:i*1.7,alive:true,dir:-1});}updatePowers();updateHUD();}
-function updateHUD(){$('score').textContent='🐟 '+score;$('lives').textContent='♥ '.repeat(lives)+'♡ '.repeat(3-lives);$('level').textContent='0'+(stage+1)+' / '+names[stage];}
+let mouse,companion,nextChunk=440,maxDistance=0,best=0,musicNext=0,musicStep=0,musicNodes=[];
+try{best=Number(localStorage.getItem('alley-chase-best'))||0;}catch{}
+function points(){return Math.floor(maxDistance/10)+score*50;}
+function saveBest(){if(points()>best){best=points();try{localStorage.setItem('alley-chase-best',String(best));}catch{}}}
+function body(x,w=58,h=46){return {x,y:G-h,w,h,vx:0,vy:0,jumps:0,face:1,grounded:true};}
+function generate(){
+ while(nextChunk<cat.x+W*2){
+  const x=nextChunk,h=65+Math.floor(Math.random()*3)*24,w=78+Math.floor(Math.random()*2)*20;
+  platforms.push({x,y:G-h,w,h});fish.push({x:x+w/2,y:G-h-45,taken:false});
+  if(Math.random()<.55)fish.push({x:x+w+100,y:G-95,taken:false});
+  if(x>1000&&Math.random()<.3)puddles.push({x:x+w+40,w:60});
+  if(x>1400&&Math.random()<Math.min(.65,.25+maxDistance/30000)){
+   const kind=Math.random()<.5?'bird':'guard',home=x+w+155;
+   enemies.push({kind,home,x:home,y:G-40,w:48,h:40,phase:Math.random()*6,alive:true,dir:-1});
+  }
+  nextChunk+=430+Math.random()*150;
+ }
+ const cutoff=cam-600;
+ platforms=platforms.filter(p=>p.x+p.w>cutoff);fish=fish.filter(f=>f.x>cutoff);
+ puddles=puddles.filter(p=>p.x+p.w>cutoff);enemies=enemies.filter(e=>e.home+150>cutoff);
+}
+function reset(){saveBest();stopMusic();musicStep=0;stage=0;score=0;lives=3;cat=body(100);mouse=body(410,35,36);companion=body(25,48,44);cam=0;maxDistance=0;nextChunk=440;inv=0;particles=[];keys.clear();jumpBuffer=0;coyote=.1;speedTime=0;speedCooldown=0;highTime=0;highCooldown=0;shotCooldown=0;shots=[];enemies=[];platforms=[];fish=[];puddles=[];generate();updatePowers();updateHUD();}
+function updateHUD(){$('score').textContent=points()+' נק׳ · 🐟 '+score;$('lives').textContent='♥ '.repeat(lives)+'♡ '.repeat(3-lives);$('level').textContent=Math.floor(maxDistance/10)+' מ׳ · שיא '+Math.max(best,points());}
+function stopMusic(){for(const n of musicNodes){try{n.stop();}catch{}}musicNodes=[];musicNext=0;}
+function music(){
+ if(!sound||state!=='playing'||!audio||audio.state!=='running')return;
+ musicNodes=musicNodes.filter(n=>n.endAt>audio.currentTime);
+ if(musicNext<audio.currentTime)musicNext=audio.currentTime;
+ const beat=60/(140+Math.min(35,maxDistance/400))/2;
+ const melody=[76,79,83,79,74,78,81,78,72,76,79,76,71,74,78,74];
+ while(musicNext<audio.currentTime+.12){
+  const note=(midi,type,volume,duration)=>{const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=440*2**((midi-69)/12);g.gain.setValueAtTime(0,musicNext);g.gain.linearRampToValueAtTime(volume,musicNext+.008);g.gain.exponentialRampToValueAtTime(.0001,musicNext+duration);o.connect(g);g.connect(audio.destination);o.start(musicNext);o.stop(musicNext+duration+.01);o.endAt=musicNext+duration+.01;o.onended=()=>{o.disconnect();g.disconnect();};musicNodes.push(o);};
+  note(melody[musicStep%16],'triangle',.04,beat*.8);
+  if(musicStep%2===0)note([45,43,41,40][Math.floor(musicStep/4)%4],'triangle',.055,beat*1.4);
+  if(musicStep%4===0)note(33,'sine',.07,.07);
+  musicNext+=beat;musicStep++;
+ }
+}
+function unlockAudio(){if(sound){audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume().catch(()=>{});}}
 function tone(f,d=.1){if(!sound)return;audio??=new(window.AudioContext||window.webkitAudioContext)();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.setValueAtTime(f,audio.currentTime);g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d);}
 function overlay(title,msg,button,over='ההרפתקה שלכם'){$('title').textContent=title;$('message').textContent=msg;$('start').textContent=button;$('overline').textContent=over;$('overlay').style.display='flex';}
-function play(){if(state==='won'){stage++;reset(false);}else if(state==='lost'||state==='finished'){reset();}state='playing';document.activeElement?.blur();keys.clear();$('overlay').style.display='none';$('pause').textContent='Ⅱ';updatePowers();}
-function pause(){if(state==='playing'){state='paused';keys.clear();overlay('העכבר מחכה לכם','עוצרים רגע, ומיד ממשיכים.','חזרה למשחק ←');$('pause').textContent='▶';updatePowers();}else if(state==='paused')play();}
-$('start').onclick=play;$('pause').onclick=pause;$('restart').onclick=()=>{reset();play();};$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'צליל פעיל ♫':'צליל כבוי ♫';$('sound').setAttribute('aria-pressed',sound);tone(600);};
+function play(){if(state==='lost')reset();state='playing';unlockAudio();document.activeElement?.blur();keys.clear();$('overlay').style.display='none';$('pause').textContent='Ⅱ';updatePowers();}
+function pause(){if(state==='playing'){state='paused';stopMusic();keys.clear();overlay('העכבר מחכה לכם','עוצרים רגע, ומיד ממשיכים.','חזרה למשחק ←');$('pause').textContent='▶';updatePowers();}else if(state==='paused')play();}
+$('start').onclick=play;$('pause').onclick=pause;$('restart').onclick=()=>{reset();play();};$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'מוזיקת מרדף ♫':'מוזיקה כבויה ♫';$('sound').setAttribute('aria-pressed',sound);if(sound)unlockAudio();else stopMusic();};
 function down(k){if(state==='playing'&&!keys.has(k)){if(k==='ShiftLeft'||k==='ShiftRight')activate('speed');if(k==='KeyE')activate('high');if(k==='KeyF')activate('shot');}if(k==='KeyP'){pause();return;}if(['Space','ArrowUp','KeyW'].includes(k)&&!keys.has(k)&&state==='playing')jumpBuffer=.13;keys.add(k);}
-window.addEventListener('keydown',e=>{if(e.target.matches('input,summary')||(['Enter','Space'].includes(e.code)&&e.target.matches('button')))return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(!e.repeat)down(e.code);});window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>{keys.clear();if(state==='playing')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')pause();});
+window.addEventListener('keydown',e=>{if(e.target.matches('input,summary')||(['Enter','Space'].includes(e.code)&&e.target.matches('button')))return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(!e.repeat)down(e.code);});window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('pagehide',saveBest);window.addEventListener('blur',()=>{keys.clear();if(state==='playing')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')pause();});
 document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);down(b.dataset.key);};b.onpointerup=b.onpointercancel=()=>keys.delete(b.dataset.key);});
 $('dogEnabled').onchange=e=>dog=e.target.checked;['cat','dog'].forEach(kind=>{$(kind+'Photo').onchange=e=>{const file=e.target.files[0];if(!file)return;if(!file.type.startsWith('image/')||file.size>10*1024*1024){$('uploadStatus').textContent='בחרו תמונה בגודל עד 10MB.';return;}const url=URL.createObjectURL(file),im=new Image();im.onload=()=>{photos[kind]=im;URL.revokeObjectURL(url);$('uploadStatus').textContent='התמונה נוספה לדמות. נשמרת עד סגירת הדף.';};im.onerror=()=>{URL.revokeObjectURL(url);$('uploadStatus').textContent='לא ניתן לפתוח את התמונה. נסו PNG או JPG.';};im.src=url;};});$('clearPhotos').onclick=()=>{photos={};$('catPhoto').value='';$('dogPhoto').value='';$('uploadStatus').textContent='התמונות אופסו.';};
 function burst(x,y,color){for(let i=0;i<12;i++)particles.push({x,y,vx:(Math.random()-.5)*160,vy:-Math.random()*160,t:.65,color});}
-function update(dt){time+=dt;if(state!=='playing')return;inv=Math.max(0,inv-dt);speedTime=Math.max(0,speedTime-dt);highTime=Math.max(0,highTime-dt);speedCooldown=Math.max(0,speedCooldown-dt);highCooldown=Math.max(0,highCooldown-dt);shotCooldown=Math.max(0,shotCooldown-dt);updatePowers();jumpBuffer-=dt;coyote-=dt;let dir=(keys.has('ArrowRight')||keys.has('KeyD')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyA')?1:0);cat.vx+=(dir*(speedTime>0?540:300)-cat.vx)*Math.min(1,dt*14);if(dir)cat.face=dir;
+function update(dt){if(state!=='playing')return;time+=dt;music();inv=Math.max(0,inv-dt);speedTime=Math.max(0,speedTime-dt);highTime=Math.max(0,highTime-dt);speedCooldown=Math.max(0,speedCooldown-dt);highCooldown=Math.max(0,highCooldown-dt);shotCooldown=Math.max(0,shotCooldown-dt);updatePowers();jumpBuffer-=dt;coyote-=dt;const pace=260+Math.min(100,maxDistance/150);cat.vx+=((speedTime>0?540:pace)-cat.vx)*Math.min(1,dt*14);cat.face=1;
 if(jumpBuffer>0&&(coyote>0||cat.jumps<2)){cat.vy=highTime>0?-760:-570;cat.jumps++;coyote=0;jumpBuffer=0;tone(cat.jumps===1?440:620);burst(cat.x+25,cat.y+cat.h,'#fff3c8');}
-const oldX=cat.x,oldBottom=cat.y+cat.h;cat.x=Math.max(0,Math.min(goal+40,cat.x+cat.vx*dt));cat.vy+=1500*dt;cat.y+=cat.vy*dt;let grounded=false;
+const oldX=cat.x,oldBottom=cat.y+cat.h;cat.x=Math.max(0,cat.x+cat.vx*dt);cat.vy+=1500*dt;cat.y+=cat.vy*dt;let grounded=false;
 for(const p of platforms){if(cat.x+cat.w>p.x+5&&cat.x<p.x+p.w-5&&cat.y+cat.h>p.y&&cat.y<G){if(oldBottom<=p.y+4&&cat.vy>=0){cat.y=p.y-cat.h;cat.vy=0;grounded=true;}else if(oldX+cat.w<=p.x+9){cat.x=p.x-cat.w;cat.vx=0;}else if(oldX>=p.x+p.w-9){cat.x=p.x+p.w;cat.vx=0;}}}
 if(cat.y+cat.h>=G){cat.y=G-cat.h;cat.vy=0;grounded=true;}if(grounded){cat.jumps=0;coyote=.1;}
 for(const f of fish)if(!f.taken&&Math.hypot(cat.x+28-f.x,cat.y+20-f.y)<48){f.taken=true;score++;burst(f.x,f.y,'#f4bc4e');tone(880);updateHUD();}
 for(const p of puddles)if(cat.x+cat.w-12>p.x&&cat.x+12<p.x+p.w&&cat.y+cat.h>=G-3)hurt('שלולית');
 updateEnemies(dt);
 
-cam+=(Math.max(0,Math.min(goal-W+260,cat.x-W*.3))-cam)*Math.min(1,dt*6);$('progress').style.width=Math.min(100,cat.x/goal*100)+'%';particles=particles.filter(p=>(p.t-=dt)>0);particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=350*dt;});
-if(cat.x>=goal&&state==='playing'){burst(cat.x,cat.y,'#f7cd69');tone(1040,.3);state=stage===2?'finished':'won';overlay(stage===2?'המרדף נגמר בחברות!':'הגעתם לעכבר!',stage===2?'כל שלושת המסלולים הושלמו. אספתם '+score+' דגים, והעכבר מזמין את כולם לגבינה.':'העכבר מכיר קיצור דרך למסלול הבא. ממשיכים יחד? ',stage===2?'עוד הרפתקה ←':'למסלול הבא ←');}}
+maxDistance=Math.max(maxDistance,cat.x-100);cam+=(Math.max(0,cat.x-W*.3)-cam)*Math.min(1,dt*6);
+generate();updateRunner(mouse,cat.x+310,dt);updateRunner(companion,cat.x-125,dt);
+$('progress').style.width=Math.min(100,((maxDistance/10)%1000)/10)+'%';
+particles=particles.filter(p=>(p.t-=dt)>0);particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=350*dt;});updateHUD();}
+function updateRunner(r,target,dt){
+ const desired=Math.max(100,Math.min(680,cat.vx+(target-r.x)*2));r.vx+=(desired-r.vx)*Math.min(1,dt*5);
+ const look=r.w+r.vx*.36;
+ const obstacle=platforms.some(p=>p.x>=r.x+r.w-4&&p.x<r.x+look&&p.y<r.y+r.h+5);
+ const water=puddles.some(p=>p.x>=r.x&&p.x<r.x+look);
+ if(r.grounded&&(obstacle||water)){r.vy=-620;r.grounded=false;}
+ const oldBottom=r.y+r.h,oldX=r.x;r.x+=r.vx*dt;r.vy+=1500*dt;r.y+=r.vy*dt;r.grounded=false;
+ for(const p of platforms)if(r.x+r.w>p.x&&r.x<p.x+p.w&&r.y+r.h>p.y){
+  if(oldBottom<=p.y+4&&r.vy>=0){r.y=p.y-r.h;r.vy=0;r.grounded=true;}
+  else if(oldX+r.w<=p.x+5&&r.y<G){r.x=p.x-r.w;r.vx=0;}
+ }
+ if(r.y+r.h>=G){r.y=G-r.h;r.vy=0;r.grounded=true;}
+}
 function activate(kind){
  if(state!=='playing')return;
  if(kind==='speed'&&speedCooldown===0){speedTime=2.5;speedCooldown=8;tone(750);}
@@ -36,7 +87,7 @@ function activate(kind){
 }
 function updatePowers(){for(const [id,label,active,cool] of [['speedPower','⚡ ריצה',speedTime,speedCooldown],['highPower','↑ קפיצת־על',highTime,highCooldown],['shotPower','🐟 ירי',0,shotCooldown]]){const b=$(id);b.textContent=label+(active>0?' · פעיל '+Math.ceil(active)+'ש׳':cool>0?' · '+(cool<1?cool.toFixed(1):Math.ceil(cool))+'ש׳':' · מוכן');b.disabled=state!=='playing'||cool>0;b.classList.toggle('active',active>0);}}
 for(const [id,kind] of [['speedPower','speed'],['highPower','high'],['shotPower','shot']])$(id).onclick=()=>{activate(kind);$(id).blur();};
-function hurt(source){if(inv>0||state!=='playing')return;lives--;inv=1.6;cat.vy=-380;burst(cat.x+28,cat.y+25,'#d97b63');tone(160,.22);updateHUD();if(lives===0){state='lost';keys.clear();overlay('נתפסתם בסמטה!',source+' עצרה את המרדף. אספתם '+score+' דגים. השתמשו בכוחות, התחמקו ונסו שוב.','מנסים שוב ←');updatePowers();}}
+function hurt(source){if(inv>0||state!=='playing')return;lives--;inv=1.6;cat.vy=-380;burst(cat.x+28,cat.y+25,'#d97b63');tone(160,.22);updateHUD();if(lives===0){state='lost';stopMusic();saveBest();keys.clear();overlay('נתפסתם בסמטה!',source+' עצרה את המרדף. '+points()+' נקודות, '+Math.floor(maxDistance/10)+' מטרים ו־'+score+' דגים. השיא שלכם: '+best+'.','מנסים שוב ←');updatePowers();}}
 function overlaps(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 function updateEnemies(dt){
  for(const e of enemies){if(!e.alive)continue;const old=e.x;e.x=e.home+Math.sin(time*(e.kind==='bird'?1.5:1.1)+e.phase)*(e.kind==='bird'?135:95);e.dir=e.x>=old?1:-1;e.y=e.kind==='bird'?G-120-Math.sin(time*2+e.phase)*75:G-40;
@@ -63,5 +114,5 @@ function draw(){ctx.clearRect(0,0,W,H);background();ctx.save();ctx.translate(-ca
 for(const p of puddles){ellipse(p.x+p.w/2,G+5,p.w/2,8,'#739fa3');ellipse(p.x+p.w/2-9,G+3,p.w*.26,2,'#c8e0d5');}
 for(const f of fish)if(!f.taken){const y=f.y+Math.sin(time*3+f.x)*5;ellipse(f.x,y,13,7,'#edb650');ctx.fillStyle='#edb650';ctx.beginPath();ctx.moveTo(f.x-9,y);ctx.lineTo(f.x-22,y-8);ctx.lineTo(f.x-22,y+8);ctx.fill();ellipse(f.x+7,y-1,1.5,1.5,'#7c673c');}
 drawEnemies();
-const mouseX=Math.min(goal+65,Math.max(440,cat.x+280));animal('mouse',mouseX,G-2,.65,1,state==='playing');rr(goal+95,G-145,5,145,2,'#577768');ctx.fillStyle='#e6a45a';ctx.beginPath();ctx.moveTo(goal+100,G-145);ctx.lineTo(goal+165,G-125);ctx.lineTo(goal+100,G-107);ctx.fill();if(dog)animal('dog',Math.max(25,cat.x-110),G-3,.8,cat.face,state==='playing'&&Math.abs(cat.vx)>20);if(inv<=0||Math.floor(inv*12)%2===0)animal('cat',cat.x+26,cat.y+cat.h,1,cat.face,state==='playing'&&Math.abs(cat.vx)>20);for(const p of particles){ctx.globalAlpha=Math.max(0,p.t/.65);ellipse(p.x,p.y,4,4,p.color);}ctx.globalAlpha=1;ctx.restore();}
+animal('mouse',mouse.x+17,mouse.y+mouse.h,.65,1,state==='playing'&&mouse.grounded);if(dog)animal('dog',companion.x+24,companion.y+companion.h,.8,1,state==='playing'&&companion.grounded);if(inv<=0||Math.floor(inv*12)%2===0)animal('cat',cat.x+26,cat.y+cat.h,1,cat.face,state==='playing'&&Math.abs(cat.vx)>20);for(const p of particles){ctx.globalAlpha=Math.max(0,p.t/.65);ellipse(p.x,p.y,4,4,p.color);}ctx.globalAlpha=1;ctx.restore();}
 function frame(t){const dt=Math.min((t-last)/1000||0,.033);last=t;update(dt);draw();requestAnimationFrame(frame);}reset();requestAnimationFrame(frame);
