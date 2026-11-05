@@ -68,3 +68,8 @@ assert.equal(stompPoints,0);assert.equal(lives,3);`);
 test('pause stops scheduled music',`
 let stopped=0;musicNodes=[{stop:()=>stopped++}];pause();
 assert.equal(stopped,1);assert.equal(musicNodes.length,0);assert.equal(state,'paused');`);
+test('chaser cannot run away ahead of a stuck cat',`
+platforms=[];puddles=[];cat.x=300;companion.x=380;companion.vx=300;
+for(let i=0;i<400&&lives===3;i++)updateChaser(.016,{...cat});
+assert.equal(lives,2);assert.ok(companion.x<cat.x);
+`);
