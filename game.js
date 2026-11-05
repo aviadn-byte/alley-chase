@@ -2,10 +2,11 @@
 const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
 const W=1200,H=600,G=505,keys=new Set(),palettes=[['#f8ddbc','#efae92','#d98672'],['#d4e8df','#e1b89b','#acbea4'],['#c4bfdc','#c390a8','#857ba1']];
 let state='ready',stage=0,score=0,lives=3,cam=0,time=0,last=0,inv=0,cat,platforms,fish,puddles,particles=[],jumpBuffer=0,coyote=0,sound=false,audio,photos={},dog=true;
+let stompPoints=0;
 let enemies=[],shots=[],speedTime=0,speedCooldown=0,highTime=0,highCooldown=0,shotCooldown=0;
 let mouse,companion,nextChunk=440,maxDistance=0,best=0,musicNext=0,musicStep=0,musicNodes=[];
 try{best=Number(localStorage.getItem('alley-chase-best'))||0;}catch{}
-function points(){return Math.floor(maxDistance/10)+score*50;}
+function points(){return Math.floor(maxDistance/10)+score*50+stompPoints;}
 function saveBest(){if(points()>best){best=points();try{localStorage.setItem('alley-chase-best',String(best));}catch{}}}
 function body(x,w=58,h=46){return {x,y:G-h,w,h,vx:0,vy:0,jumps:0,face:1,grounded:true};}
 function generate(){
@@ -24,7 +25,7 @@ function generate(){
  platforms=platforms.filter(p=>p.x+p.w>cutoff);fish=fish.filter(f=>f.x>cutoff);
  puddles=puddles.filter(p=>p.x+p.w>cutoff);enemies=enemies.filter(e=>e.home+150>cutoff);
 }
-function reset(){saveBest();stopMusic();musicStep=0;stage=0;score=0;lives=3;cat=body(100);mouse=body(410,35,36);companion=body(25,48,44);cam=0;maxDistance=0;nextChunk=440;inv=0;particles=[];keys.clear();jumpBuffer=0;coyote=.1;speedTime=0;speedCooldown=0;highTime=0;highCooldown=0;shotCooldown=0;shots=[];enemies=[];platforms=[];fish=[];puddles=[];generate();updatePowers();updateHUD();}
+function reset(){saveBest();stopMusic();musicStep=0;stage=0;score=0;stompPoints=0;lives=3;cat=body(100);mouse=body(410,35,36);companion=body(25,48,44);cam=0;maxDistance=0;nextChunk=440;inv=0;particles=[];keys.clear();jumpBuffer=0;coyote=.1;speedTime=0;speedCooldown=0;highTime=0;highCooldown=0;shotCooldown=0;shots=[];enemies=[];platforms=[];fish=[];puddles=[];generate();updatePowers();updateHUD();}
 function updateHUD(){$('score').textContent=points()+' נק׳ · 🐟 '+score;$('lives').textContent='♥ '.repeat(lives)+'♡ '.repeat(3-lives);$('level').textContent=Math.floor(maxDistance/10)+' מ׳ · שיא '+Math.max(best,points());}
 function stopMusic(){for(const n of musicNodes){try{n.stop();}catch{}}musicNodes=[];musicNext=0;}
 function music(){
@@ -59,7 +60,7 @@ for(const p of platforms){if(cat.x+cat.w>p.x+5&&cat.x<p.x+p.w-5&&cat.y+cat.h>p.y
 if(cat.y+cat.h>=G){cat.y=G-cat.h;cat.vy=0;grounded=true;}if(grounded){cat.jumps=0;coyote=.1;}
 for(const f of fish)if(!f.taken&&Math.hypot(cat.x+28-f.x,cat.y+20-f.y)<48){f.taken=true;score++;burst(f.x,f.y,'#f4bc4e');tone(880);updateHUD();}
 for(const p of puddles)if(cat.x+cat.w-12>p.x&&cat.x+12<p.x+p.w&&cat.y+cat.h>=G-3)hurt('שלולית');
-updateEnemies(dt);
+updateEnemies(dt,{x:oldX,y:oldBottom-cat.h,w:cat.w,h:cat.h});
 
 maxDistance=Math.max(maxDistance,cat.x-100);cam+=(Math.max(0,cat.x-W*.3)-cam)*Math.min(1,dt*6);
 generate();updateRunner(mouse,cat.x+310,dt);updateRunner(companion,cat.x-125,dt);
@@ -89,13 +90,33 @@ function updatePowers(){for(const [id,label,active,cool] of [['speedPower','⚡ 
 for(const [id,kind] of [['speedPower','speed'],['highPower','high'],['shotPower','shot']])$(id).onclick=()=>{activate(kind);$(id).blur();};
 function hurt(source){if(inv>0||state!=='playing')return;lives--;inv=1.6;cat.vy=-380;burst(cat.x+28,cat.y+25,'#d97b63');tone(160,.22);updateHUD();if(lives===0){state='lost';stopMusic();saveBest();keys.clear();overlay('נתפסתם בסמטה!',source+' עצרה את המרדף. '+points()+' נקודות, '+Math.floor(maxDistance/10)+' מטרים ו־'+score+' דגים. השיא שלכם: '+best+'.','מנסים שוב ←');updatePowers();}}
 function overlaps(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
-function updateEnemies(dt){
- for(const e of enemies){if(!e.alive)continue;const old=e.x;e.x=e.home+Math.sin(time*(e.kind==='bird'?1.5:1.1)+e.phase)*(e.kind==='bird'?135:95);e.dir=e.x>=old?1:-1;e.y=e.kind==='bird'?G-120-Math.sin(time*2+e.phase)*75:G-40;
+// Swept relative crossing: a descending cat must cross the enemy's top.
+function contactEnemy(e,previousCat,previousEnemy,persistent=false){
+ if(state!=='playing'||(persistent&&e.stun>0))return;
+ const before=previousCat.y+previousCat.h-previousEnemy.y;
+ const after=cat.y+cat.h-e.y;
+ const crossing=after-before;
+ const t=crossing>0?-before/crossing:-1;
+ const cx=previousCat.x+(cat.x-previousCat.x)*t;
+ const ex=previousEnemy.x+(e.x-previousEnemy.x)*t;
+ if(cat.vy>0&&before<=0&&after>=0&&t>=0&&t<=1&&cx+cat.w-10>ex&&cx+10<ex+e.w){
+  stompPoints+=100;cat.y=e.y-cat.h;cat.vy=-470;cat.jumps=0;coyote=0;
+  if(persistent){e.stun=2;e.vx=0;}else e.alive=false;
+  burst(e.x+e.w/2,e.y,'#f4bc4e');tone(980);updateHUD();
+  return;
+ }
+ if(overlaps({x:cat.x+10,y:cat.y+7,w:cat.w-20,h:cat.h-7},e)){
+  hurt(persistent?'הכלב הרודף':e.kind==='bird'?'ציפור השמירה':'כלב השמירה');
+  if(persistent&&inv>0){e.x=Math.min(e.x,cat.x-160);e.stun=.7;e.vx=0;}
+ }
+}
+function updateEnemies(dt,previousCat){
+ for(const e of enemies){if(!e.alive)continue;e.previous={x:e.x,y:e.y};const old=e.x;e.x=e.home+Math.sin(time*(e.kind==='bird'?1.5:1.1)+e.phase)*(e.kind==='bird'?135:95);e.dir=e.x>=old?1:-1;e.y=e.kind==='bird'?G-120-Math.sin(time*2+e.phase)*75:G-40;
  if(e.kind==='guard')for(const p of platforms)if(e.x+e.w>p.x&&e.x<p.x+p.w)e.y=Math.min(e.y,p.y-e.h);
  }
  for(const shot of shots){const oldX=shot.x;shot.x+=shot.vx*dt;shot.life-=dt;const sweep={x:Math.min(oldX,shot.x)-16,y:shot.y-6,w:Math.abs(shot.x-oldX)+32,h:12};for(const e of enemies)if(e.alive&&overlaps(sweep,e)){e.alive=false;shot.life=0;burst(e.x+24,e.y+20,'#f4bc4e');tone(700);break;}}
  shots=shots.filter(s=>s.life>0);
- for(const e of enemies)if(e.alive&&overlaps({x:cat.x+10,y:cat.y+7,w:cat.w-20,h:cat.h-7},e))hurt(e.kind==='bird'?'ציפור השמירה':'כלבת השמירה');
+ for(const e of enemies)if(e.alive)contactEnemy(e,previousCat,e.previous);
 }
 function drawEnemies(){
  for(const e of enemies){if(!e.alive)continue;const x=e.x+24,y=e.y+e.h;
