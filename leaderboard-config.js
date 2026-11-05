@@ -1,2 +1,1 @@
-// Filled by leaderboard/setup.mjs after the shared service is deployed.
-window.ALLEY_LEADERBOARD_API = '';
+window.ALLEY_LEADERBOARD_API = "https://alley-chase-scores.aviadn-byte-alley.workers.dev";

@@ -1,0 +1,17 @@
+{
+  "name": "alley-chase-scores",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-01-01",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://aviadn-byte.github.io"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "alley-chase-scores",
+      "database_id": "c4341b81-ef0d-4036-9806-2b33f14b8ed1",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
