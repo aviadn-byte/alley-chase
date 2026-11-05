@@ -6,3 +6,30 @@
 .leaderboard{margin-top:28px;border:1px solid #dce1d6;border-radius:18px;padding:24px;background:#fffdf6}.leaderboard-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.leaderboard h2{font-size:23px;margin:0}.leaderboard p,.leaderboard label{font-size:13px;line-height:1.7;color:#526b60}.leaderboard table{width:100%;border-collapse:collapse;text-align:right;margin-top:16px}.leaderboard caption{text-align:right;font-size:12px;color:#718177;margin:8px 0}.leaderboard th,.leaderboard td{padding:12px;border-bottom:1px solid #e3e8df}.leaderboard th{background:#edf2e8}.leaderboard td:last-child{font-weight:bold;color:#244f46}.score-entry{display:flex;gap:10px;margin-top:10px}.score-entry input{min-width:0;flex:1;border:1px solid #b7c8ba;border-radius:10px;padding:12px;font:inherit}#scoreForm{padding:16px;background:#f4efd9;border-radius:12px;margin:16px 0}#scoreForm[hidden]{display:none}@media(max-width:700px){.leaderboard{padding:16px}.leaderboard-heading{align-items:flex-start}.leaderboard h2{font-size:18px}.leaderboard-heading button{font-size:11px}.score-entry{flex-direction:column}.game{min-height:340px}.overlay p{margin:8px;padding:8px;line-height:1.5}.overlay h2{font-size:21px;margin-top:8px}.primary{padding:12px 22px}.hud span,.hud button{backdrop-filter:none}}
 
 .shmil-intro{display:flex;align-items:center;gap:16px;margin-top:18px;color:#526b60;font-weight:bold}.shmil-portrait{width:90px;height:90px;border-radius:50%;overflow:hidden;position:relative;border:3px solid #e4c49a;flex-shrink:0;box-shadow:0 4px 12px #243e3d15}.shmil-portrait img{position:absolute;width:273px;height:auto;max-width:none;left:-90px;top:-123px}
+
+/* Mobile play surface: preserve canvas proportions and reserve thumb controls. */
+canvas{object-fit:contain}
+.touch button,.powers button{touch-action:manipulation;-webkit-user-select:none;user-select:none;min-height:48px}
+@media(max-width:900px),(pointer:coarse){
+ .touch{display:flex}.touch button{min-height:64px;font-size:21px;font-weight:bold;background:#244f46;color:white;touch-action:none}
+ .play-shell{background:#f3cdb3;border-radius:18px;padding-bottom:10px}
+ .game{min-height:0;aspect-ratio:2/1;box-shadow:none}
+ .powers{margin:10px;gap:6px}.powers button{min-width:0;font-size:12px;padding:8px 5px}
+ .touch{margin:10px}.overlay{overflow:auto;padding:12px}.overlay .eyebrow{display:none}.overlay p{font-size:12px;line-height:1.4;margin:6px}.overlay h2{font-size:20px;margin:4px}
+ body.game-active{overflow:hidden;overscroll-behavior:none}
+ body.game-active header{position:fixed;inset:0 0 auto;z-index:20;height:60px;padding:8px 14px;background:#f9f7ef;padding-top:max(8px,env(safe-area-inset-top))}
+ body.game-active header .brand{font-size:15px}body.game-active header .tag{display:none}
+ body.game-active #sound{margin-right:auto;min-height:44px;font-size:12px}
+ body.game-active .play-shell{position:fixed;inset:60px 0 0;height:calc(100dvh - 60px);z-index:19;border-radius:0;display:grid;grid-template-columns:minmax(0,1fr) 104px;grid-template-rows:minmax(0,1fr) auto;gap:8px;padding:0 max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));direction:ltr}
+ body.game-active .game{grid-column:1/-1;width:100%;height:100%;aspect-ratio:auto;border-radius:0;direction:rtl}
+ body.game-active .powers{grid-column:1;grid-row:2;margin:0;direction:rtl;align-items:stretch}
+ body.game-active .touch{grid-column:2;grid-row:2;margin:0}
+ body.game-active .touch button{padding:10px}
+ body.game-active .intro,body.game-active .power-help,body.game-active .below,body.game-active details,body.game-active .leaderboard,body.game-active footer{display:none}
+ .hud{top:8px;left:8px;right:8px;gap:4px}.hud span{font-size:10px;padding:6px}.hud button{min-width:44px;min-height:44px;padding:6px}
+}
+@media(max-width:900px) and (orientation:landscape){
+ body.game-active header{height:48px}body.game-active .play-shell{inset:48px 0 0;height:calc(100dvh - 48px);grid-template-columns:155px minmax(0,1fr) 88px;grid-template-rows:minmax(0,1fr)}
+ body.game-active .game{grid-column:2;grid-row:1}body.game-active .powers{grid-column:1;grid-row:1;flex-direction:column;justify-content:center}body.game-active .powers button{flex:0 1 auto}
+ body.game-active .touch{grid-column:3;grid-row:1;align-self:end}
+}
