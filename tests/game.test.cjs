@@ -57,3 +57,14 @@ for(let i=0;i<36000;i++){
  assert.ok(platforms.length<30&&enemies.length<30);
 }
 `);
+test('stomps work with double jump and speed power',`
+cat.x=120;cat.y=165;cat.vy=300;cat.jumps=2;speedTime=2;
+contactEnemy({x:120,y:200,w:48,h:40,alive:true},{x:100,y:140,w:58,h:46},{x:120,y:200});
+assert.equal(stompPoints,100);assert.equal(cat.jumps,0);assert.equal(lives,3);`);
+test('removed enemy cannot award again through update',`
+enemies=[{x:100,y:200,w:48,h:40,alive:false,home:100,phase:0,kind:'bird'}];
+cat.x=100;cat.y=165;cat.vy=300;updateEnemies(.016,{x:100,y:140,w:58,h:46});
+assert.equal(stompPoints,0);assert.equal(lives,3);`);
+test('pause stops scheduled music',`
+let stopped=0;musicNodes=[{stop:()=>stopped++}];pause();
+assert.equal(stopped,1);assert.equal(musicNodes.length,0);assert.equal(state,'paused');`);
