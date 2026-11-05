@@ -18,5 +18,6 @@ try{
  if(!url)throw new Error('Deploy output did not include the public Worker URL. Keep the deployed service; do not recreate it.');
  const response=await fetch(url+'/top');if(!response.ok||!Array.isArray((await response.json()).entries))throw new Error('Public API verification failed. The game configuration was not changed.');
  writeFileSync(new URL('../leaderboard-config.js',import.meta.url),'window.ALLEY_LEADERBOARD_API = '+JSON.stringify(url)+';\n');
- console.log('Shared leaderboard verified. Commit leaderboard-config.js and publish the game to activate it.');
+ const page=new URL('../index.html',import.meta.url);writeFileSync(page,readFileSync(page,'utf8').replace(/leaderboard-config\.js(?:\?v=[^\"]*)?/, 'leaderboard-config.js?v='+Date.now()));
+ console.log('Shared leaderboard verified. Commit leaderboard-config.js and index.html, then publish the game to activate it.');
 }catch(e){console.error(e.message);process.exitCode=1;}
