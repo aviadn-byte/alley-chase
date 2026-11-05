@@ -38,3 +38,22 @@ assert.equal(stompPoints,100);assert.equal(d.stun,2);assert.equal(lives,3);`);
 test('score combines distance fish and stomp and resets',`
 maxDistance=1000;score=2;stompPoints=100;assert.equal(points(),300);
 reset();assert.equal(points(),0);assert.equal(best,300);`);
+test('dog catches a stationary cat, damage has recovery',`
+platforms=[];puddles=[];cat.x=300;cat.vx=0;companion.x=100;
+for(let i=0;i<100&&lives===3;i++)updateChaser(.016,{...cat});
+assert.equal(lives,2);assert.ok(companion.stun>0);assert.ok(companion.x<=cat.x-160);
+updateChaser(.016,{...cat});assert.equal(lives,2);`);
+test('pursuer jumps obstacles',`
+platforms=[{x:100,y:G-100,w:80,h:100}];puddles=[];cat.x=250;cat.vx=260;companion.x=40;companion.vx=240;
+updateChaser(.016,{...cat});assert.ok(companion.vy<0);`);
+test('pause freezes pursuit and score',`
+state='paused';const x=companion.x;update(.033);assert.equal(companion.x,x);assert.equal(points(),0);`);
+test('ten minute endless simulation stays finite and bounded',`
+for(let i=0;i<36000;i++){
+ if(state==='lost'){reset();state='playing';}
+ if(i%32===0)jumpBuffer=.13;
+ update(1/60);
+ assert.ok(Number.isFinite(cat.x)&&Number.isFinite(companion.y));
+ assert.ok(platforms.length<30&&enemies.length<30);
+}
+`);

@@ -25,7 +25,7 @@ function generate(){
  platforms=platforms.filter(p=>p.x+p.w>cutoff);fish=fish.filter(f=>f.x>cutoff);
  puddles=puddles.filter(p=>p.x+p.w>cutoff);enemies=enemies.filter(e=>e.home+150>cutoff);
 }
-function reset(){saveBest();stopMusic();musicStep=0;stage=0;score=0;stompPoints=0;lives=3;cat=body(100);mouse=body(410,35,36);companion=body(25,48,44);cam=0;maxDistance=0;nextChunk=440;inv=0;particles=[];keys.clear();jumpBuffer=0;coyote=.1;speedTime=0;speedCooldown=0;highTime=0;highCooldown=0;shotCooldown=0;shots=[];enemies=[];platforms=[];fish=[];puddles=[];generate();updatePowers();updateHUD();}
+function reset(){saveBest();stopMusic();musicStep=0;stage=0;score=0;stompPoints=0;lives=3;cat=body(100);mouse=body(410,35,36);companion=body(-65,48,44);companion.stun=0;cam=0;maxDistance=0;nextChunk=440;inv=0;particles=[];keys.clear();jumpBuffer=0;coyote=.1;speedTime=0;speedCooldown=0;highTime=0;highCooldown=0;shotCooldown=0;shots=[];enemies=[];platforms=[];fish=[];puddles=[];generate();updatePowers();updateHUD();}
 function updateHUD(){$('score').textContent=points()+' נק׳ · 🐟 '+score;$('lives').textContent='♥ '.repeat(lives)+'♡ '.repeat(3-lives);$('level').textContent=Math.floor(maxDistance/10)+' מ׳ · שיא '+Math.max(best,points());}
 function stopMusic(){for(const n of musicNodes){try{n.stop();}catch{}}musicNodes=[];musicNext=0;}
 function music(){
@@ -51,7 +51,7 @@ $('start').onclick=play;$('pause').onclick=pause;$('restart').onclick=()=>{reset
 function down(k){if(state==='playing'&&!keys.has(k)){if(k==='ShiftLeft'||k==='ShiftRight')activate('speed');if(k==='KeyE')activate('high');if(k==='KeyF')activate('shot');}if(k==='KeyP'){pause();return;}if(['Space','ArrowUp','KeyW'].includes(k)&&!keys.has(k)&&state==='playing')jumpBuffer=.13;keys.add(k);}
 window.addEventListener('keydown',e=>{if(e.target.matches('input,summary')||(['Enter','Space'].includes(e.code)&&e.target.matches('button')))return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(!e.repeat)down(e.code);});window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('pagehide',saveBest);window.addEventListener('blur',()=>{keys.clear();if(state==='playing')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')pause();});
 document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);down(b.dataset.key);};b.onpointerup=b.onpointercancel=()=>keys.delete(b.dataset.key);});
-$('dogEnabled').onchange=e=>dog=e.target.checked;['cat','dog'].forEach(kind=>{$(kind+'Photo').onchange=e=>{const file=e.target.files[0];if(!file)return;if(!file.type.startsWith('image/')||file.size>10*1024*1024){$('uploadStatus').textContent='בחרו תמונה בגודל עד 10MB.';return;}const url=URL.createObjectURL(file),im=new Image();im.onload=()=>{photos[kind]=im;URL.revokeObjectURL(url);$('uploadStatus').textContent='התמונה נוספה לדמות. נשמרת עד סגירת הדף.';};im.onerror=()=>{URL.revokeObjectURL(url);$('uploadStatus').textContent='לא ניתן לפתוח את התמונה. נסו PNG או JPG.';};im.src=url;};});$('clearPhotos').onclick=()=>{photos={};$('catPhoto').value='';$('dogPhoto').value='';$('uploadStatus').textContent='התמונות אופסו.';};
+$('dogEnabled').onchange=e=>{dog=e.target.checked;if(dog){companion.x=cat.x-180;companion.stun=1;}};['cat','dog'].forEach(kind=>{$(kind+'Photo').onchange=e=>{const file=e.target.files[0];if(!file)return;if(!file.type.startsWith('image/')||file.size>10*1024*1024){$('uploadStatus').textContent='בחרו תמונה בגודל עד 10MB.';return;}const url=URL.createObjectURL(file),im=new Image();im.onload=()=>{photos[kind]=im;URL.revokeObjectURL(url);$('uploadStatus').textContent='התמונה נוספה לדמות. נשמרת עד סגירת הדף.';};im.onerror=()=>{URL.revokeObjectURL(url);$('uploadStatus').textContent='לא ניתן לפתוח את התמונה. נסו PNG או JPG.';};im.src=url;};});$('clearPhotos').onclick=()=>{photos={};$('catPhoto').value='';$('dogPhoto').value='';$('uploadStatus').textContent='התמונות אופסו.';};
 function burst(x,y,color){for(let i=0;i<12;i++)particles.push({x,y,vx:(Math.random()-.5)*160,vy:-Math.random()*160,t:.65,color});}
 function update(dt){if(state!=='playing')return;time+=dt;music();inv=Math.max(0,inv-dt);speedTime=Math.max(0,speedTime-dt);highTime=Math.max(0,highTime-dt);speedCooldown=Math.max(0,speedCooldown-dt);highCooldown=Math.max(0,highCooldown-dt);shotCooldown=Math.max(0,shotCooldown-dt);updatePowers();jumpBuffer-=dt;coyote-=dt;const pace=260+Math.min(100,maxDistance/150);cat.vx+=((speedTime>0?540:pace)-cat.vx)*Math.min(1,dt*14);cat.face=1;
 if(jumpBuffer>0&&(coyote>0||cat.jumps<2)){cat.vy=highTime>0?-760:-570;cat.jumps++;coyote=0;jumpBuffer=0;tone(cat.jumps===1?440:620);burst(cat.x+25,cat.y+cat.h,'#fff3c8');}
@@ -63,11 +63,24 @@ for(const p of puddles)if(cat.x+cat.w-12>p.x&&cat.x+12<p.x+p.w&&cat.y+cat.h>=G-3
 updateEnemies(dt,{x:oldX,y:oldBottom-cat.h,w:cat.w,h:cat.h});
 
 maxDistance=Math.max(maxDistance,cat.x-100);cam+=(Math.max(0,cat.x-W*.3)-cam)*Math.min(1,dt*6);
-generate();updateRunner(mouse,cat.x+310,dt);updateRunner(companion,cat.x-125,dt);
+generate();updateRunner(mouse,cat.x+310,dt);if(dog)updateChaser(dt,{x:oldX,y:oldBottom-cat.h,w:cat.w,h:cat.h});
 $('progress').style.width=Math.min(100,((maxDistance/10)%1000)/10)+'%';
 particles=particles.filter(p=>(p.t-=dt)>0);particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=350*dt;});updateHUD();}
-function updateRunner(r,target,dt){
- const desired=Math.max(100,Math.min(680,cat.vx+(target-r.x)*2));r.vx+=(desired-r.vx)*Math.min(1,dt*5);
+function updateChaser(dt,previousCat){
+ const previous={x:companion.x,y:companion.y};
+ companion.stun=Math.max(0,companion.stun-dt);
+ if(companion.stun>0){
+  companion.vx=0;companion.vy+=1500*dt;companion.y+=companion.vy*dt;
+  if(companion.y+companion.h>=G){companion.y=G-companion.h;companion.vy=0;companion.grounded=true;}
+  return;
+ }
+ // Keep pursuit visible after a sprint, but never teleport into the cat.
+ if(companion.x<cat.x-650){companion.x=cat.x-650;companion.y=G-companion.h;companion.vy=0;}
+ updateRunner(companion,cat.x-125,dt,true);
+ contactEnemy(companion,previousCat,previous,true);
+}
+function updateRunner(r,target,dt,chasing=false){
+ const desired=chasing?Math.max(220,Math.min(580,240+Math.min(100,maxDistance/150)+(target-r.x)*1.4)):Math.max(100,Math.min(680,cat.vx+(target-r.x)*2));r.vx+=(desired-r.vx)*Math.min(1,dt*5);
  const look=r.w+r.vx*.36;
  const obstacle=platforms.some(p=>p.x>=r.x+r.w-4&&p.x<r.x+look&&p.y<r.y+r.h+5);
  const water=puddles.some(p=>p.x>=r.x&&p.x<r.x+look);
@@ -135,5 +148,5 @@ function draw(){ctx.clearRect(0,0,W,H);background();ctx.save();ctx.translate(-ca
 for(const p of puddles){ellipse(p.x+p.w/2,G+5,p.w/2,8,'#739fa3');ellipse(p.x+p.w/2-9,G+3,p.w*.26,2,'#c8e0d5');}
 for(const f of fish)if(!f.taken){const y=f.y+Math.sin(time*3+f.x)*5;ellipse(f.x,y,13,7,'#edb650');ctx.fillStyle='#edb650';ctx.beginPath();ctx.moveTo(f.x-9,y);ctx.lineTo(f.x-22,y-8);ctx.lineTo(f.x-22,y+8);ctx.fill();ellipse(f.x+7,y-1,1.5,1.5,'#7c673c');}
 drawEnemies();
-animal('mouse',mouse.x+17,mouse.y+mouse.h,.65,1,state==='playing'&&mouse.grounded);if(dog)animal('dog',companion.x+24,companion.y+companion.h,.8,1,state==='playing'&&companion.grounded);if(inv<=0||Math.floor(inv*12)%2===0)animal('cat',cat.x+26,cat.y+cat.h,1,cat.face,state==='playing'&&Math.abs(cat.vx)>20);for(const p of particles){ctx.globalAlpha=Math.max(0,p.t/.65);ellipse(p.x,p.y,4,4,p.color);}ctx.globalAlpha=1;ctx.restore();}
+animal('mouse',mouse.x+17,mouse.y+mouse.h,.65,1,state==='playing'&&mouse.grounded);if(dog){animal('dog',companion.x+24,companion.y+companion.h,.8,1,state==='playing'&&companion.grounded&&companion.stun===0);if(companion.stun>0){ctx.fillStyle='#f4bc4e';ctx.font='bold 24px Arial';ctx.fillText('✦ ✦',companion.x,companion.y-18);}}if(inv<=0||Math.floor(inv*12)%2===0)animal('cat',cat.x+26,cat.y+cat.h,1,cat.face,state==='playing'&&Math.abs(cat.vx)>20);for(const p of particles){ctx.globalAlpha=Math.max(0,p.t/.65);ellipse(p.x,p.y,4,4,p.color);}ctx.globalAlpha=1;ctx.restore();}
 function frame(t){const dt=Math.min((t-last)/1000||0,.033);last=t;update(dt);draw();requestAnimationFrame(frame);}reset();requestAnimationFrame(frame);
