@@ -3,6 +3,11 @@ const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d'),$=id=>
 const W=1200,H=600,G=505,keys=new Set(),palettes=[['#f8ddbc','#efae92','#d98672'],['#d4e8df','#e1b89b','#acbea4'],['#c4bfdc','#c390a8','#857ba1']];
 let state='ready',stage=0,score=0,lives=3,cam=0,time=0,last=0,inv=0,cat,platforms,fish,puddles,particles=[],jumpBuffer=0,coyote=0,sound=false,audio,photos={},dog=true;
 let stompPoints=0;
+let belleSprite=null;
+if(typeof Image!=='undefined'){
+ const im=new Image();im.onload=()=>{belleSprite=im;};im.src='assets/belle-sprites.png';
+}
+function belleFrame(moving,grounded,stunned,t){return stunned?3:!grounded?2:moving?Math.floor(t*8)%2:3;}
 let defaultCatPhoto=null;
 if(typeof Image!=='undefined'){
  const im=new Image();im.onload=()=>{defaultCatPhoto=im;if(!photos.cat)photos.cat=im;};im.src='assets/shmil.jpg';
@@ -123,7 +128,7 @@ function contactEnemy(e,previousCat,previousEnemy,persistent=false){
   return;
  }
  if(overlaps({x:cat.x+10,y:cat.y+7,w:cat.w-20,h:cat.h-7},e)){
-  hurt(persistent?'הכלב הרודף':e.kind==='bird'?'ציפור השמירה':'כלב השמירה');
+  hurt(persistent?'בל':e.kind==='bird'?'ציפור השמירה':'כלב השמירה');
   if(persistent&&inv>0){e.x=Math.min(e.x,cat.x-160);e.stun=.7;e.vx=0;}
  }
 }
@@ -147,6 +152,16 @@ function drawEnemies(){
 function rr(x,y,w,h,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}function ellipse(x,y,rx,ry,color){ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fill();}function line(points,color,width=3){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(...p):ctx.moveTo(...p));ctx.stroke();}
 function facePhoto(kind,x,y,r){if(!photos[kind])return;ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.clip();const im=photos[kind],s=Math.min(im.width,im.height);if(im===defaultCatPhoto)ctx.drawImage(im,190,260,190,190,x-r,y-r,r*2,r*2);else ctx.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,x-r,y-r,r*2,r*2);ctx.restore();}
 function chaseDog(x,y,scale,dir,moving){
+ if(belleSprite&&!photos.dog){
+  const frame=belleFrame(moving,companion.grounded,companion.stun>0,time);
+  const boxes=[[50,80,680,350],[890,80,570,350],[60,580,660,330],[880,550,580,420]];
+  const [sx,sy,sw,sh]=boxes[frame],h=frame===3?70:frame===2?55:60,w=h*sw/sh;
+  ctx.save();ctx.translate(x,y);ctx.scale(scale*dir,scale);
+  ellipse(0,4,36,6,'#385c4430');
+  ctx.drawImage(belleSprite,sx,sy,sw,sh,48-w,-h,w,h);
+  ctx.restore();return;
+ }
+
  ctx.save();ctx.translate(x,y);ctx.scale(scale*dir,scale);
  const gait=moving?Math.sin(time*13):0,wag=Math.sin(time*10)*9;
  ellipse(0,4,36,6,'#385c4430');

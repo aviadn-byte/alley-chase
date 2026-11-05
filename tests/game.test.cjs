@@ -73,3 +73,10 @@ platforms=[];puddles=[];cat.x=300;companion.x=380;companion.vx=300;
 for(let i=0;i<400&&lives===3;i++)updateChaser(.016,{...cat});
 assert.equal(lives,2);assert.ok(companion.x<cat.x);
 `);
+
+test('Belle poses follow movement, jump and stun', `
+assert.equal(belleFrame(true,true,false,0),0);
+assert.equal(belleFrame(true,true,false,.13),1);
+assert.equal(belleFrame(true,false,false,.13),2);
+assert.equal(belleFrame(true,true,true,.13),3);
+assert.equal(belleFrame(false,true,false,.13),3);`);
